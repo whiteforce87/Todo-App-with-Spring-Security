@@ -1,6 +1,5 @@
 package com.in28minutes.rest.webservices.restfulwebservices.repository;
 
-import com.in28minutes.rest.webservices.restfulwebservices.model.Users;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,14 +11,14 @@ import java.util.Optional;
  * to the user objects.
  * @author fatih akguc
  */
-
+/*
 @Repository
 public interface UsersRepository extends JpaRepository<Users, Integer> {
 	List<Users> findAll();
-	Optional<Users> findByUsername(String username);
-	Users findUserByUsername(String username);
+	Optional<Users> findUsersByUsername(String username);
+	//Users findUserByUsername(String username);
 	Users findUserById(long id);
 	Users save(Users user);
 	void delete(Users user);
 	
-}
+}*/

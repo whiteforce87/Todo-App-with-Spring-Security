@@ -33,6 +33,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -108,7 +109,7 @@ public class RestfulWebServicesApplication {
 		return "Pdf is read and written!";
 
 	}
-*/
+*//*
 	@Bean
 	public WebMvcConfigurer corsConfigurer() {
 		return new WebMvcConfigurer() {
@@ -119,6 +120,6 @@ public class RestfulWebServicesApplication {
 			}
 		};
 	}
-
+*/
 
 }

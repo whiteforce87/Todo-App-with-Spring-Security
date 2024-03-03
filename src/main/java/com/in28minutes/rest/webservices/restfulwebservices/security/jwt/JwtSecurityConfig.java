@@ -26,6 +26,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionRegistryImpl;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -37,12 +39,20 @@ import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthen
 import org.springframework.security.oauth2.server.resource.web.access.BearerTokenAccessDeniedHandler;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
+import org.springframework.web.cors.CorsConfiguration;
 
 import javax.sql.DataSource;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.UUID;
 
 import static org.springframework.security.config.Customizer.withDefaults;
@@ -61,10 +71,18 @@ public class JwtSecurityConfig {
     @Value("${spring.security.authority.query}")
     String authorityQuery;
 
+    @Value("${jwt.accessTokenCookieName}")
+    private String cookieName;
+
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         return httpSecurity
+
+                .cors() // Enable CORS
+                .and()
+                .csrf(csrf -> csrf
+                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
                 .csrf(AbstractHttpConfigurer::disable) // (1)
                 .sessionManagement(
                         session -> 
@@ -72,21 +90,37 @@ public class JwtSecurityConfig {
                                 SessionCreationPolicy.STATELESS)
                 //.maximumSessions(1).maxSessionsPreventsLogin(true)
                 )
+                .cors().configurationSource(request -> {
+                    CorsConfiguration corsConfig = new CorsConfiguration();
+                    corsConfig.setAllowedOrigins(Arrays.asList("http://localhost:3000")); // Allow requests from any origin (you can restrict this if needed)
+                    corsConfig.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE")); // Allow only specific HTTP methods
+                    corsConfig.setAllowedHeaders(Collections.singletonList("*")); // Allow any headers
+                    corsConfig.setAllowCredentials(true); // Allow credentials (cookies)
+                    return corsConfig;
+                }).and()
+
+                .logout()
+                .logoutUrl("/logout")
+                .logoutSuccessUrl("/logout")
+                .deleteCookies(cookieName) // Specify the name of your authentication cookie
+                .invalidateHttpSession(true).and()
 
                 .authorizeHttpRequests(
                         auth -> 
                             auth.requestMatchers("/", //#CHANGE
                             		"/authenticate","/registerUser","/actuator/**","/swagger-ui.html","/swagger-ui/**"
-                                            ,"/v3/**","/explorer/**")
+                                            ,"/v3/**","/explorer/**","/refreshToken","/checkAuth")
                                 .permitAll()
                                     .requestMatchers(PathRequest.toH2Console())
                                     .permitAll()
                                     .requestMatchers(HttpMethod.OPTIONS,"/**")
                                 .permitAll()
-                                   .requestMatchers(HttpMethod.POST,"/updateUser").hasAnyAuthority("ROLE_USER","ROLE_ADMIN")
+                                 //  .requestMatchers(HttpMethod.POST,"/updateUser").hasAnyAuthority("ROLE_USER","ROLE_ADMIN")
 
                                     .anyRequest()
                                 .authenticated()) // (3)
+                 //.addFilterAfter(new JwtRequestFilter(), UsernamePasswordAuthenticationFilter.class) // Add JWT token filter
+
                 .oauth2ResourceServer((oauth2) -> oauth2.jwt(withDefaults())) // (4)
                 .exceptionHandling(
                         (ex) -> 
@@ -94,10 +128,57 @@ public class JwtSecurityConfig {
                                 new BearerTokenAuthenticationEntryPoint())
                               .accessDeniedHandler(
                                 new BearerTokenAccessDeniedHandler()))
-                .httpBasic(
-                        withDefaults()) // (5)
-                .headers(header -> header.frameOptions(frameOptionsConfig -> frameOptionsConfig.sameOrigin()))
+                //.httpBasic(
+                //        withDefaults()) // (5)
+                .headers()
+                                .referrerPolicy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER).and()
+                                .referrerPolicy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN).and()
+                                .xssProtection()
+                                .and()
+                                .contentSecurityPolicy("form-action 'self'").and()
+                                .addHeaderWriter(new StaticHeadersWriter("Feature-Policy", "accelerometer 'none';" +
+                                        " ambient-light-sensor 'none';" +
+                                        " animations 'self';" +
+                                        " autoplay 'none';" +
+                                        " camera 'none';" +
+                                        " cookie 'self';" +
+                                        " encrypted-media 'none';" +
+                                        " fullscreen 'self';" +
+                                        " geolocation 'none';" +
+                                        " gyroscope 'none';" +
+                                        " magnetometer 'none';" +
+                                        " max-downscaling-image 'self';" +
+                                        " microphone 'none';" +
+                                        " midi 'none';" +
+                                        " payment 'none';" +
+                                        " picture-in-picture 'self';" +
+                                        " speaker 'none';" +
+                                        " sync-script 'self';" +
+                                        " sync-xhr 'self';" +
+                                        " unsized-media 'self';" +
+                                        " usb 'none';" +
+                                        " vertical-scroll 'self';" +
+                                        " vr 'none'"))
+                .addHeaderWriter(new StaticHeadersWriter("X-XSS-Protection", "1; mode=block"))
+                .referrerPolicy()
+                .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.SAME_ORIGIN).and()
+                .frameOptions(frameOptionsConfig -> frameOptionsConfig.sameOrigin()).and()
+
+
                 .build();
+
+
+
+    }
+
+    @Bean
+    public HttpSessionEventPublisher httpSessionEventPublisher() {
+        return new HttpSessionEventPublisher();
+    }
+
+    @Bean
+    public SessionRegistry sessionRegistry(){
+        return  new SessionRegistryImpl();
     }
 
     @Bean

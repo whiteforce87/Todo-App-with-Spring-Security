@@ -1,13 +1,7 @@
 package com.in28minutes.rest.webservices.restfulwebservices.todo;
 
-//import com.in28minutes.rest.webservices.restfulwebservices.model.Users;
-//import com.in28minutes.rest.webservices.restfulwebservices.repository.UserRepository;
-import com.in28minutes.rest.webservices.restfulwebservices.model.UserDto;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

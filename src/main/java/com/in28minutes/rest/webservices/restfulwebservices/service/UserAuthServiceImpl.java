@@ -1,6 +1,7 @@
 package com.in28minutes.rest.webservices.restfulwebservices.service;
 
 import com.in28minutes.rest.webservices.restfulwebservices.model.UserDto;
+import com.in28minutes.rest.webservices.restfulwebservices.model.UserInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +11,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.JdbcUserDetailsManager;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
 import java.util.ArrayList;
@@ -26,9 +28,17 @@ public class UserAuthServiceImpl implements UserAuthService{
     @Autowired
     DataSource dataSource;
 
+    @Autowired
+    UserInfoService userInfoService;
 
+
+
+
+
+    @Transactional
     public UserDto registerUser(UserDto userDto){
 
+        saveUser(userDto);
 
         var jdbcUserDetailsManager = new JdbcUserDetailsManager(dataSource);
 
@@ -36,7 +46,7 @@ public class UserAuthServiceImpl implements UserAuthService{
 
         List<GrantedAuthority> grantedAuths = new ArrayList<>();
         userDto.getRoles().forEach(role -> {
-            grantedAuths.add(new SimpleGrantedAuthority("ROLE_" + role));
+            grantedAuths.add(new SimpleGrantedAuthority(role));
         });
         userDto.setAuthorities(grantedAuths);
 
@@ -45,7 +55,10 @@ public class UserAuthServiceImpl implements UserAuthService{
         return userDto;
     }
 
+    @Transactional
     public UserDto updateUser(UserDto userDto) {
+
+        saveUser(userDto);
 
         var jdbcUserDetailsManager = new JdbcUserDetailsManager(dataSource);
 
@@ -56,7 +69,7 @@ public class UserAuthServiceImpl implements UserAuthService{
 
         List<GrantedAuthority> grantedAuths = new ArrayList<>();
         userDto.getRoles().forEach(role -> {
-            grantedAuths.add(new SimpleGrantedAuthority("ROLE_" + role));
+            grantedAuths.add(new SimpleGrantedAuthority(role));
         });
         updatedUser.setAuthorities(grantedAuths);
 
@@ -65,10 +78,26 @@ public class UserAuthServiceImpl implements UserAuthService{
         return userDto;
     }
 
-
+    @Transactional
     public void deleteUser(UserDto userDto) {
+
+        UserInfo userToDelete = userInfoService.findUserByName(userDto.getUsername()).get();
+
+        userInfoService.delete(userToDelete);
 
         var jdbcUserDetailsManager = new JdbcUserDetailsManager(dataSource);
         jdbcUserDetailsManager.deleteUser(userDto.getUsername());
+    }
+
+    private UserInfo saveUser(UserDto userDto){
+
+        UserInfo userInfo = new UserInfo();
+        userInfo.setUsername(userDto.getUsername());
+        userInfo.setAddress(userDto.getAddress());
+        userInfo.setEmail(userDto.getEmail());
+        userInfo.setGender(userDto.getGender());
+        userInfo.setPhone(userDto.getPhone());
+
+        return userInfoService.createUser(userInfo);
     }
 }
